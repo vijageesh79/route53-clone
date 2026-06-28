@@ -9,6 +9,7 @@ if DATABASE_URL.startswith("postgres://"):
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    pool_pre_ping=not DATABASE_URL.startswith("sqlite"),
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

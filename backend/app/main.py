@@ -32,19 +32,28 @@ ALLOWED_ORIGINS = [
 ]
 
 
+BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
 def run_migrations() -> None:
+    from .database import Base
+
+    if os.getenv("VERCEL") or IS_PRODUCTION:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables ensured via create_all")
+        return
+
     try:
         subprocess.run(
             [sys.executable, "-m", "alembic", "upgrade", "head"],
             check=True,
             capture_output=True,
             text=True,
+            cwd=BACKEND_ROOT,
         )
         logger.info("Alembic migrations applied")
     except subprocess.CalledProcessError as exc:
         logger.warning("Alembic failed, falling back to create_all: %s", exc.stderr)
-        from .database import Base
-
         Base.metadata.create_all(bind=engine)
 
 
@@ -132,14 +141,17 @@ def seed_health_checks(db):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    run_migrations()
-    db = SessionLocal()
     try:
-        seed_users(db)
-        seed_sample_data(db)
-        seed_health_checks(db)
-    finally:
-        db.close()
+        run_migrations()
+        db = SessionLocal()
+        try:
+            seed_users(db)
+            seed_sample_data(db)
+            seed_health_checks(db)
+        finally:
+            db.close()
+    except Exception:
+        logger.exception("Startup initialization failed")
     logger.info("Route53 API started (env=%s)", ENV)
     yield
     logger.info("Route53 API shutting down")

@@ -1,7 +1,8 @@
 import type { DashboardStats, DNSRecord, HealthCheck, HostedZone, PaginatedResponse, RecordType, User } from "./types";
 import { toApiPathId } from "./paths";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "/backend" : "");
 
 class ApiError extends Error {
   status: number;
