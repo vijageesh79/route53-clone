@@ -292,15 +292,15 @@ Interactive API docs: http://127.0.0.1:8000/docs
 
 | Item | Status |
 |------|--------|
-| Next.js `output: standalone` + security headers | ✅ |
-| Gunicorn + Uvicorn workers (backend) | ✅ |
-| Readiness probe `/api/health/ready` | ✅ |
-| Docker health checks + restart policies | ✅ |
-| Secure cookies (`COOKIE_SECURE=true`) for HTTPS | ✅ |
-| API docs disabled in production (set `ENABLE_DOCS=true` to override) | ✅ |
-| Error boundaries (`error.tsx`, `global-error.tsx`) | ✅ |
-| Persistent DB volume (Docker / Render disk) | ✅ |
-| CI: pytest + lint + build | ✅ |
+| Next.js `output: standalone` + security headers | done |
+| Gunicorn + Uvicorn workers (backend) | done |
+| Readiness probe `/api/health/ready` | done |
+| Docker health checks + restart policies | done |
+| Secure cookies (`COOKIE_SECURE=true`) for HTTPS | done |
+| API docs disabled in production (set `ENABLE_DOCS=true` to override) | done |
+| Error boundaries (`error.tsx`, `global-error.tsx`) | done |
+| Persistent DB volume (Docker / Render disk) | done |
+| CI: pytest + lint + build | done |
 
 ### Production environment variables
 
@@ -331,3 +331,4 @@ For production deployment:
 | `ALLOWED_ORIGINS` | Backend | Comma-separated frontend origins for CORS |
 | `COOKIE_SECURE` | Backend | `true` in production (Secure + SameSite=None cookies) |
 | `DATABASE_URL` | Backend | SQLite path; use persistent disk on Render |
+
