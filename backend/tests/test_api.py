@@ -1,36 +1,21 @@
-import pytest
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-@pytest.fixture
-def auth_cookies():
-    response = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
-    assert response.status_code == 200
-    return response.cookies
-
-
-def test_health():
+def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
 
-def test_readiness():
+def test_readiness(client):
     response = client.get("/api/health/ready")
     assert response.status_code == 200
     assert response.json()["database"] == "ok"
 
 
-def test_login_invalid():
+def test_login_invalid(client):
     response = client.post("/api/auth/login", json={"username": "admin", "password": "wrong"})
     assert response.status_code == 401
 
 
-def test_list_hosted_zones(auth_cookies):
+def test_list_hosted_zones(client, auth_cookies):
     response = client.get("/api/hosted-zones", cookies=auth_cookies)
     assert response.status_code == 200
     data = response.json()
@@ -38,7 +23,7 @@ def test_list_hosted_zones(auth_cookies):
     assert len(data["items"]) >= 1
 
 
-def test_get_zone_and_records(auth_cookies):
+def test_get_zone_and_records(client, auth_cookies):
     zones = client.get("/api/hosted-zones", cookies=auth_cookies).json()["items"]
     zone_id = zones[0]["id"].lstrip("/")
 
@@ -50,7 +35,7 @@ def test_get_zone_and_records(auth_cookies):
     assert records.json()["total"] >= 1
 
 
-def test_create_zone_requires_private_vpc(auth_cookies):
+def test_create_zone_requires_private_vpc(client, auth_cookies):
     response = client.post(
         "/api/hosted-zones",
         json={"name": "bad.private.", "type": "Private"},
@@ -59,7 +44,7 @@ def test_create_zone_requires_private_vpc(auth_cookies):
     assert response.status_code == 422
 
 
-def test_create_zone_and_delegation_ns(auth_cookies):
+def test_create_zone_and_delegation_ns(client, auth_cookies):
     response = client.post(
         "/api/hosted-zones",
         json={"name": "pytest-demo.com", "type": "Public", "description": "test"},
@@ -76,7 +61,7 @@ def test_create_zone_and_delegation_ns(auth_cookies):
     assert delete.status_code == 200
 
 
-def test_record_validation(auth_cookies):
+def test_record_validation(client, auth_cookies):
     zones = client.get("/api/hosted-zones", cookies=auth_cookies).json()["items"]
     zone_id = zones[0]["id"].lstrip("/")
 
@@ -88,7 +73,7 @@ def test_record_validation(auth_cookies):
     assert bad.status_code == 422
 
 
-def test_dashboard_stats(auth_cookies):
+def test_dashboard_stats(client, auth_cookies):
     response = client.get("/api/stats", cookies=auth_cookies)
     assert response.status_code == 200
     data = response.json()
@@ -96,7 +81,7 @@ def test_dashboard_stats(auth_cookies):
     assert data["record_count"] >= 1
 
 
-def test_health_checks(auth_cookies):
+def test_health_checks(client, auth_cookies):
     response = client.get("/api/health-checks", cookies=auth_cookies)
     assert response.status_code == 200
     assert response.json()["total"] >= 1
