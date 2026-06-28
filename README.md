@@ -49,13 +49,16 @@ chmod +x start.sh
 ./start.sh
 ```
 
-### Docker (production-like)
+### Docker (production)
 
 ```bash
-docker compose up --build
+chmod +x prod.sh
+./prod.sh
 ```
 
-Then open **http://localhost:3000** (login: admin / admin123).
+Runs both services in production mode with health checks, persistent SQLite volume, and Gunicorn (backend) + Next.js standalone (frontend).
+
+Open **http://localhost:3000** (login: admin / admin123).
 
 ### Deploy to Render (live demo)
 
@@ -102,8 +105,8 @@ alembic revision --autogenerate -m "description"  # new migration
 - **Next.js 14** App Router with TypeScript
 - **AWS Cloudscape Design System** — official AWS UI components (AppLayout, TopNavigation, Table, Modal)
 - Auth context with session persistence via HTTP-only cookies
-- Pages: Login, Hosted Zones (list/create/edit/delete), Zone Detail with DNS Records CRUD
-- Placeholder pages: Dashboard, Health Checks, Traffic Policies, Resolver, Profiles
+- Pages: Login, Dashboard (live stats), Hosted Zones, Zone Detail, Health Checks
+- Placeholder pages: Traffic Policies, Resolver, Profiles
 
 ### Backend (`backend/`)
 
@@ -206,6 +209,15 @@ alembic revision --autogenerate -m "description"  # new migration
 
 **Supported record types:** A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA (+ SOA for zone apex)
 
+### Health Checks & Stats
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/stats` | Dashboard counts and recent activity |
+| GET | `/api/health-checks` | List health checks |
+| POST | `/api/health-checks` | Create health check |
+| DELETE | `/api/health-checks/{id}` | Delete health check |
+
 ### Health
 
 | Method | Endpoint      | Description   |
@@ -230,7 +242,27 @@ alembic revision --autogenerate -m "description"  # new migration
 - **Export** hosted zones as JSON or BIND
 - Docker Compose for one-command deployment
 - Sample data seeded on first run
-- Placeholder sections for non-core Route 53 features
+- **NS delegation modal** after creating a hosted zone
+- **Routing policy** editor (Simple, Weighted, Failover, Geolocation) and alias records
+- **DNS validation** (IPv4/IPv6, CNAME, MX format) on create/update
+- **Live dashboard** with zone/record/health-check counts
+- **Health checks** CRUD page with seeded demo data
+- **Pagination** and **copy ID** on hosted zones table
+- **pytest** API tests in CI
+- Placeholder sections for Traffic Policies, Resolver, Profiles
+
+## Demo walkthrough (~60 seconds)
+
+1. Open http://localhost:3000 and sign in with **admin / admin123**
+2. Visit **Dashboard** — see live hosted zone, record, and health check counts
+3. Go to **Hosted zones** → **Create hosted zone** → enter `mydemo.com`
+4. Review the **Delegation instructions** modal with NS records (copy to clipboard)
+5. Open the zone → **Create record** (A record) with routing policy / alias options
+6. **Export BIND** or **Import BIND** to test zone file workflows
+7. Visit **Health checks** → create or delete a check
+8. Toggle **Dark mode** from the top navigation bar
+
+Interactive API docs: http://127.0.0.1:8000/docs
 
 ## Project Structure
 
@@ -256,12 +288,46 @@ alembic revision --autogenerate -m "description"  # new migration
 └── README.md
 ```
 
+## Production checklist
+
+| Item | Status |
+|------|--------|
+| Next.js `output: standalone` + security headers | ✅ |
+| Gunicorn + Uvicorn workers (backend) | ✅ |
+| Readiness probe `/api/health/ready` | ✅ |
+| Docker health checks + restart policies | ✅ |
+| Secure cookies (`COOKIE_SECURE=true`) for HTTPS | ✅ |
+| API docs disabled in production (set `ENABLE_DOCS=true` to override) | ✅ |
+| Error boundaries (`error.tsx`, `global-error.tsx`) | ✅ |
+| Persistent DB volume (Docker / Render disk) | ✅ |
+| CI: pytest + lint + build | ✅ |
+
+### Production environment variables
+
+| Variable | Service | Required | Description |
+|----------|---------|----------|-------------|
+| `ENV` | Backend | Yes (prod) | Set to `production` |
+| `API_URL` | Frontend | Yes | Full backend URL, e.g. `https://route53-api.onrender.com` |
+| `ALLOWED_ORIGINS` | Backend | Yes | Frontend URL(s), comma-separated |
+| `COOKIE_SECURE` | Backend | Yes (HTTPS) | `true` for cross-origin HTTPS cookies |
+| `DATABASE_URL` | Backend | Yes | Use persistent path in production |
+| `WEB_CONCURRENCY` | Backend | Optional | Gunicorn workers (default: 2) |
+| `ENABLE_DOCS` | Backend | Optional | `true` to expose `/docs` in production |
+
 ## Deployment Notes
 
 For production deployment:
 
-1. Deploy FastAPI backend (e.g. Railway, Render, EC2)
-2. Deploy Next.js frontend (e.g. Vercel)
-3. Set `API_URL` in frontend environment to point to the backend
-4. Update CORS origins in `backend/app/main.py` to include your frontend URL
-5. Use a production WSGI server (gunicorn + uvicorn workers) for the API
+1. Deploy FastAPI backend (e.g. Render — see `render.yaml` with persistent disk)
+2. Deploy Next.js frontend (e.g. Vercel or Render)
+3. Set `API_URL` on frontend to `https://your-api.onrender.com`
+4. Set `ALLOWED_ORIGINS` on backend to your frontend URL
+5. Set `COOKIE_SECURE=true` on backend for HTTPS cross-origin cookies
+6. Update `frontend/vercel.json` rewrite destination to your backend URL
+
+| Variable | Service | Description |
+|----------|---------|-------------|
+| `API_URL` | Frontend | Backend URL for Next.js `/api` rewrites |
+| `ALLOWED_ORIGINS` | Backend | Comma-separated frontend origins for CORS |
+| `COOKIE_SECURE` | Backend | `true` in production (Secure + SameSite=None cookies) |
+| `DATABASE_URL` | Backend | SQLite path; use persistent disk on Render |

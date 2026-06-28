@@ -30,11 +30,7 @@ export function CloudscapeShell({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
 
   if (pathname === "/login") {
-    return (
-      <div className="login-page">
-        <div className="login-page-inner">{children}</div>
-      </div>
-    );
+    return <>{children}</>;
   }
 
   const activeHref =

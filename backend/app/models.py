@@ -90,3 +90,23 @@ class DNSRecord(Base):
         Index("ix_dns_records_zone_type", "hosted_zone_id", "type"),
         Index("ix_dns_records_zone_name_type", "hosted_zone_id", "name", "type"),
     )
+
+
+class HealthCheck(Base):
+    __tablename__ = "health_checks"
+
+    id = Column(String(20), primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    endpoint = Column(String(512), nullable=False)
+    protocol = Column(String(10), nullable=False, default="HTTPS")
+    port = Column(Integer, nullable=False, default=443)
+    path = Column(String(255), nullable=True, default="/")
+    interval_seconds = Column(Integer, nullable=False, default=30)
+    failure_threshold = Column(Integer, nullable=False, default=3)
+    status = Column(String(20), nullable=False, default="Healthy", index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )

@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Route 53 Clone — Frontend
 
-## Getting Started
+Next.js 14 App Router console for the Route 53 clone. Uses **AWS Cloudscape Design System** for the main UI.
 
-First, run the development server:
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 (requires backend at http://127.0.0.1:8000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Description |
+|----------|-------------|
+| `API_URL` | Backend URL for Next.js rewrites (server-side). Default: `http://127.0.0.1:8000` |
+| `NEXT_PUBLIC_API_URL` | Optional client-side API base (leave empty to use same-origin `/api` proxy) |
 
-## Learn More
+## Key routes
 
-To learn more about Next.js, take a look at the following resources:
+- `/login` — Sign in
+- `/dashboard` — Live stats overview
+- `/hosted-zones` — Zone list with pagination, copy ID, NS delegation
+- `/hosted-zones/[id]` — DNS records with routing policy / alias editor
+- `/health-checks` — Health check management
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run dev` — Development server
+- `npm run build` — Production build
+- `npm run lint` — ESLint

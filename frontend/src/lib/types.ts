@@ -46,3 +46,26 @@ export interface PaginatedResponse<T> {
 export type RecordType = "A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "PTR" | "SRV" | "CAA";
 
 export const RECORD_TYPES: RecordType[] = ["A", "AAAA", "CNAME", "TXT", "MX", "NS", "PTR", "SRV", "CAA"];
+
+export type RoutingPolicy = "Simple" | "Weighted" | "Failover" | "Geolocation";
+
+export interface DashboardStats {
+  hosted_zone_count: number;
+  record_count: number;
+  health_check_count: number;
+  recent_activity: { title: string; detail: string; time: string }[];
+}
+
+export interface HealthCheck {
+  id: string;
+  name: string;
+  endpoint: string;
+  protocol: "HTTP" | "HTTPS" | "TCP";
+  port: number;
+  path: string | null;
+  interval_seconds: number;
+  failure_threshold: number;
+  status: "Healthy" | "Unhealthy" | "Pending";
+  created_at: string;
+  updated_at: string;
+}

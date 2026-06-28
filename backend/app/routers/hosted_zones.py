@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..bind_utils import export_zone_bind, export_zone_json_string, parse_bind_zone
+from ..dns_validation import normalize_record_name
 from ..database import get_db
 from ..models import DNSRecord, HostedZone, User, generate_id
 from ..schemas import (
@@ -157,6 +158,35 @@ def bulk_delete_zones(
     return BulkDeleteResponse(message=f"Deleted {deleted} hosted zone(s)", deleted_count=deleted)
 
 
+@router.get("/{zone_id:path}/export")
+def export_hosted_zone(
+    zone_id: str,
+    format: str = Query("json", pattern="^(json|bind)$"),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    zone_id = normalize_zone_id(zone_id)
+    zone = db.query(HostedZone).filter(HostedZone.id == zone_id).first()
+    if not zone:
+        raise HTTPException(status_code=404, detail="Hosted zone not found")
+
+    records = db.query(DNSRecord).filter(DNSRecord.hosted_zone_id == zone_id).all()
+
+    if format == "bind":
+        content = export_zone_bind(zone, records)
+        return Response(
+            content=content,
+            media_type="text/plain",
+            headers={"Content-Disposition": f'attachment; filename="{zone.name.rstrip(".")}.zone"'},
+        )
+
+    return Response(
+        content=export_zone_json_string(zone, records),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{zone.name.rstrip(".")}.json"'},
+    )
+
+
 @router.get("/{zone_id:path}", response_model=HostedZoneResponse)
 def get_hosted_zone(
     zone_id: str,
@@ -221,35 +251,6 @@ def delete_hosted_zone(
     return MessageResponse(message=f"Hosted zone {zone_id} deleted successfully")
 
 
-@router.get("/{zone_id:path}/export")
-def export_hosted_zone(
-    zone_id: str,
-    format: str = Query("json", pattern="^(json|bind)$"),
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    zone_id = normalize_zone_id(zone_id)
-    zone = db.query(HostedZone).filter(HostedZone.id == zone_id).first()
-    if not zone:
-        raise HTTPException(status_code=404, detail="Hosted zone not found")
-
-    records = db.query(DNSRecord).filter(DNSRecord.hosted_zone_id == zone_id).all()
-
-    if format == "bind":
-        content = export_zone_bind(zone, records)
-        return Response(
-            content=content,
-            media_type="text/plain",
-            headers={"Content-Disposition": f'attachment; filename="{zone.name.rstrip(".")}.zone"'},
-        )
-
-    return Response(
-        content=export_zone_json_string(zone, records),
-        media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{zone.name.rstrip(".")}.json"'},
-    )
-
-
 # DNS Records endpoints
 records_router = APIRouter(prefix="/api/hosted-zones/{zone_id:path}/records", tags=["dns-records"])
 
@@ -308,18 +309,12 @@ def create_record(
     if not zone:
         raise HTTPException(status_code=404, detail="Hosted zone not found")
 
-    record_name = data.name.strip()
-    if not record_name.endswith(".") and record_name != "@":
-        if not record_name.endswith(zone.name.rstrip(".")):
-            if "." not in record_name or not record_name.endswith("."):
-                record_name = f"{record_name}.{zone.name}" if record_name != "@" else zone.name
-        if not record_name.endswith("."):
-            record_name += "."
+    record_name = normalize_record_name(data.name, zone.name)
 
     record = DNSRecord(
         id=generate_id("/change/"),
         hosted_zone_id=zone_id,
-        name=record_name if record_name != "@" else zone.name,
+        name=record_name,
         type=data.type,
         ttl=data.ttl,
         value=data.value.strip(),
@@ -375,8 +370,9 @@ def update_record(
     if not record:
         raise HTTPException(status_code=404, detail="DNS record not found")
 
-    if data.name is not None:
-        record.name = data.name.strip()
+    zone = db.query(HostedZone).filter(HostedZone.id == zone_id).first()
+    if data.name is not None and zone:
+        record.name = normalize_record_name(data.name, zone.name)
     if data.type is not None:
         record.type = data.type
     if data.ttl is not None:

@@ -1,4 +1,4 @@
-import type { DNSRecord, HostedZone, PaginatedResponse, RecordType, User } from "./types";
+import type { DashboardStats, DNSRecord, HealthCheck, HostedZone, PaginatedResponse, RecordType, User } from "./types";
 import { toApiPathId } from "./paths";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -14,19 +14,32 @@ class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const isForm = options.body instanceof FormData;
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    credentials: "include",
-    headers: {
-      ...(isForm ? {} : { "Content-Type": "application/json" }),
-      ...(options.headers || {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      credentials: "include",
+      headers: {
+        ...(isForm ? {} : { "Content-Type": "application/json" }),
+        ...(options.headers || {}),
+      },
+    });
+  } catch {
+    throw new ApiError("Cannot reach the API. Start the backend with: cd backend && python run.py", 0);
+  }
 
   if (!response.ok) {
-    const data = await response.json().catch(() => ({ detail: "Request failed" }));
+    const data = await response.json().catch(() => ({ detail: null }));
     const detail = data.detail;
-    const message = typeof detail === "string" ? detail : Array.isArray(detail) ? detail[0]?.msg : "Request failed";
+    let message =
+      typeof detail === "string"
+        ? detail
+        : Array.isArray(detail)
+          ? detail[0]?.msg
+          : null;
+    if (!message && response.status >= 500) {
+      message = "Cannot reach the API. Start the backend with: cd backend && python run.py";
+    }
     throw new ApiError(message || "Request failed", response.status);
   }
 
@@ -52,6 +65,29 @@ export const api = {
   logout: () => request<{ message: string }>("/api/auth/logout", { method: "POST" }),
 
   me: () => request<User>("/api/auth/me"),
+
+  getStats: () => request<DashboardStats>("/api/stats"),
+
+  listHealthChecks: (params: { search?: string; page?: number; page_size?: number }) => {
+    const query = new URLSearchParams();
+    if (params.search) query.set("search", params.search);
+    if (params.page) query.set("page", String(params.page));
+    if (params.page_size) query.set("page_size", String(params.page_size));
+    return request<PaginatedResponse<HealthCheck>>(`/api/health-checks?${query}`);
+  },
+
+  createHealthCheck: (data: {
+    name: string;
+    endpoint: string;
+    protocol: "HTTP" | "HTTPS" | "TCP";
+    port: number;
+    path?: string;
+    interval_seconds?: number;
+    failure_threshold?: number;
+  }) => request<HealthCheck>("/api/health-checks", { method: "POST", body: JSON.stringify(data) }),
+
+  deleteHealthCheck: (id: string) =>
+    request<{ message: string }>(`/api/health-checks/${toApiPathId(id)}`, { method: "DELETE" }),
 
   listHostedZones: (params: { search?: string; type?: string; page?: number; page_size?: number }) => {
     const query = new URLSearchParams();
@@ -108,7 +144,20 @@ export const api = {
     return request<PaginatedResponse<DNSRecord>>(`/api/hosted-zones/${zonePath(zoneId)}/records?${query}`);
   },
 
-  createRecord: (zoneId: string, data: { name: string; type: RecordType; ttl: number; value: string }) =>
+  createRecord: (
+    zoneId: string,
+    data: {
+      name: string;
+      type: RecordType;
+      ttl: number;
+      value: string;
+      routing_policy?: string;
+      weight?: number | null;
+      failover?: string | null;
+      alias_target?: boolean;
+      health_check_id?: string | null;
+    }
+  ) =>
     request<DNSRecord>(`/api/hosted-zones/${zonePath(zoneId)}/records`, {
       method: "POST",
       body: JSON.stringify(data),
@@ -117,7 +166,17 @@ export const api = {
   updateRecord: (
     zoneId: string,
     recordId: string,
-    data: Partial<{ name: string; type: RecordType; ttl: number; value: string }>
+    data: Partial<{
+      name: string;
+      type: RecordType;
+      ttl: number;
+      value: string;
+      routing_policy: string;
+      weight: number | null;
+      failover: string | null;
+      alias_target: boolean;
+      health_check_id: string | null;
+    }>
   ) =>
     request<DNSRecord>(`/api/hosted-zones/${zonePath(zoneId)}/records/${zonePath(recordId)}`, {
       method: "PUT",

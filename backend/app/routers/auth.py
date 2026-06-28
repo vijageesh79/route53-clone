@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from ..auth import (
-    SESSION_COOKIE,
-    SESSION_DURATION_DAYS,
+    clear_session_cookie,
     create_session,
     delete_session,
     get_current_user,
     get_session_id,
+    set_session_cookie,
     verify_password,
 )
 from ..database import get_db
@@ -24,14 +24,7 @@ def login(data: LoginRequest, response: Response, db: Session = Depends(get_db))
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
     session_id = create_session(db, user)
-    response.set_cookie(
-        key=SESSION_COOKIE,
-        value=session_id,
-        httponly=True,
-        max_age=SESSION_DURATION_DAYS * 24 * 3600,
-        samesite="lax",
-        path="/",
-    )
+    set_session_cookie(response, session_id)
     return AuthResponse(user=UserResponse.model_validate(user), session_id=session_id)
 
 
@@ -40,7 +33,7 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     session_id = get_session_id(request)
     if session_id:
         delete_session(db, session_id)
-    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    clear_session_cookie(response)
     return MessageResponse(message="Logged out successfully")
 
 

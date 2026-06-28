@@ -1,3 +1,4 @@
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -69,6 +70,29 @@ def delete_session(db: Session, session_id: str) -> None:
 
 def get_session_id(request: Request) -> Optional[str]:
     return request.cookies.get(SESSION_COOKIE)
+
+
+def set_session_cookie(response, session_id: str) -> None:
+    secure = os.getenv("COOKIE_SECURE", "false").lower() in ("1", "true", "yes")
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=session_id,
+        httponly=True,
+        max_age=SESSION_DURATION_DAYS * 24 * 3600,
+        samesite="none" if secure else "lax",
+        secure=secure,
+        path="/",
+    )
+
+
+def clear_session_cookie(response) -> None:
+    secure = os.getenv("COOKIE_SECURE", "false").lower() in ("1", "true", "yes")
+    response.delete_cookie(
+        key=SESSION_COOKIE,
+        path="/",
+        samesite="none" if secure else "lax",
+        secure=secure,
+    )
 
 
 def get_current_user(

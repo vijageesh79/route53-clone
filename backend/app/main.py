@@ -1,14 +1,26 @@
+import logging
 import os
 import subprocess
 import sys
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from .auth import seed_users
-from .database import SessionLocal
-from .models import DNSRecord, HostedZone, generate_id
-from .routers import auth, hosted_zones
+from .database import SessionLocal, engine
+from .models import DNSRecord, HealthCheck, HostedZone, generate_id
+from .routers import auth, health_checks, hosted_zones, stats
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+logger = logging.getLogger("route53")
+
+ENV = os.getenv("ENV", "development").lower()
+IS_PRODUCTION = ENV in ("production", "prod")
 
 ALLOWED_ORIGINS = [
     origin.strip()
@@ -19,20 +31,6 @@ ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
-app = FastAPI(title="Route53 Clone API", version="1.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(auth.router)
-app.include_router(hosted_zones.router)
-app.include_router(hosted_zones.records_router)
-
 
 def run_migrations() -> None:
     try:
@@ -42,9 +40,10 @@ def run_migrations() -> None:
             capture_output=True,
             text=True,
         )
-    except subprocess.CalledProcessError:
-        # Fallback for existing databases created before Alembic
-        from .database import Base, engine
+        logger.info("Alembic migrations applied")
+    except subprocess.CalledProcessError as exc:
+        logger.warning("Alembic failed, falling back to create_all: %s", exc.stderr)
+        from .database import Base
 
         Base.metadata.create_all(bind=engine)
 
@@ -85,19 +84,103 @@ def seed_sample_data(db):
     ]
     db.add_all(records)
     db.commit()
+    logger.info("Seeded sample hosted zones and records")
 
 
-@app.on_event("startup")
-def startup():
+def seed_health_checks(db):
+    if db.query(HealthCheck).count() > 0:
+        return
+    checks = [
+        HealthCheck(
+            id=generate_id("/healthcheck/"),
+            name="example.com homepage",
+            endpoint="example.com",
+            protocol="HTTPS",
+            port=443,
+            path="/",
+            interval_seconds=30,
+            failure_threshold=3,
+            status="Healthy",
+        ),
+        HealthCheck(
+            id=generate_id("/healthcheck/"),
+            name="api.internal.local",
+            endpoint="10.0.1.50",
+            protocol="HTTP",
+            port=80,
+            path="/health",
+            interval_seconds=10,
+            failure_threshold=2,
+            status="Healthy",
+        ),
+        HealthCheck(
+            id=generate_id("/healthcheck/"),
+            name="mail.example.com SMTP",
+            endpoint="mail.example.com",
+            protocol="TCP",
+            port=25,
+            path=None,
+            interval_seconds=60,
+            failure_threshold=3,
+            status="Pending",
+        ),
+    ]
+    db.add_all(checks)
+    db.commit()
+    logger.info("Seeded sample health checks")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     run_migrations()
     db = SessionLocal()
     try:
         seed_users(db)
         seed_sample_data(db)
+        seed_health_checks(db)
     finally:
         db.close()
+    logger.info("Route53 API started (env=%s)", ENV)
+    yield
+    logger.info("Route53 API shutting down")
+
+
+app = FastAPI(
+    title="Route53 Clone API",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url=None if IS_PRODUCTION and os.getenv("ENABLE_DOCS", "").lower() not in ("1", "true", "yes") else "/docs",
+    redoc_url=None if IS_PRODUCTION and os.getenv("ENABLE_DOCS", "").lower() not in ("1", "true", "yes") else "/redoc",
+    openapi_url=None if IS_PRODUCTION and os.getenv("ENABLE_DOCS", "").lower() not in ("1", "true", "yes") else "/openapi.json",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth.router)
+app.include_router(stats.router)
+app.include_router(health_checks.router)
+app.include_router(hosted_zones.records_router)
+app.include_router(hosted_zones.router)
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "env": ENV}
+
+
+@app.get("/api/health/ready")
+def readiness():
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "ok"}
+    except Exception as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}") from exc

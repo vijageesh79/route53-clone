@@ -15,6 +15,7 @@ else
   source venv/bin/activate
 fi
 
+alembic upgrade head
 python run.py &
 BACKEND_PID=$!
 
@@ -30,6 +31,7 @@ echo ""
 echo "Backend:  http://127.0.0.1:8000"
 echo "Frontend: http://localhost:3000"
 echo "Login:    admin / admin123"
+echo "API docs: http://127.0.0.1:8000/docs"
 echo ""
 echo "Press Ctrl+C to stop"
 

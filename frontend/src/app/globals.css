@@ -4,6 +4,31 @@
   box-sizing: border-box;
 }
 
+:root,
+[data-theme="light"] {
+  --aws-bg: #f2f3f3;
+  --aws-surface: #ffffff;
+  --aws-surface-alt: #fafafa;
+  --aws-border: #d5dbdb;
+  --aws-text: #16191f;
+  --aws-text-secondary: #545b64;
+  --aws-link: #0073bb;
+  --aws-orange: #ff9900;
+  --aws-success: #1d8102;
+  --aws-error: #d13212;
+}
+
+[data-theme="dark"] {
+  --aws-bg: #0f1419;
+  --aws-surface: #16191f;
+  --aws-surface-alt: #232f3e;
+  --aws-border: #414d5c;
+  --aws-text: #eaeded;
+  --aws-text-secondary: #aab7b8;
+  --aws-link: #42b4ff;
+  --aws-orange: #ff9900;
+}
+
 html,
 body {
   margin: 0;
@@ -11,19 +36,12 @@ body {
   min-height: 100%;
 }
 
-/* Login page (no AppLayout shell) */
-.login-page {
+.login-shell {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f2f3f3;
   padding: 24px;
-}
-
-.login-page-inner {
-  width: 100%;
-  max-width: 440px;
 }
 
 awsui-app-layout:not([class*="awsui_root"]) {
@@ -73,5 +91,10 @@ awsui-app-layout:not([class*="awsui_root"]) {
     border-color: #d5dbdb;
     background: #fff;
     color: #16191f;
+  }
+
+  .aws-page-title {
+    @apply text-2xl font-normal;
+    color: var(--aws-text);
   }
 }
