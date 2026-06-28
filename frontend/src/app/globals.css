@@ -1,0 +1,77 @@
+/* Cloudscape provides base styles — avoid Tailwind preflight conflicts */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+/* Login page (no AppLayout shell) */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f2f3f3;
+  padding: 24px;
+}
+
+.login-page-inner {
+  width: 100%;
+  max-width: 440px;
+}
+
+awsui-app-layout:not([class*="awsui_root"]) {
+  min-height: calc(100vh - 56px);
+}
+
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .aws-btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded px-4 py-1.5 text-sm font-medium text-white transition-colors;
+    background: #ff9900;
+    border: 1px solid #d45b07;
+  }
+
+  .aws-btn-primary:hover:not(:disabled) {
+    background: #ec7211;
+  }
+
+  .aws-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .aws-btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded border px-4 py-1.5 text-sm font-medium transition-colors;
+    background: #fff;
+    border-color: #d5dbdb;
+    color: #16191f;
+  }
+
+  .aws-btn-link {
+    color: #0073bb;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+
+  .aws-card {
+    @apply rounded border bg-white;
+    border-color: #d5dbdb;
+  }
+
+  .aws-input {
+    @apply w-full rounded border px-3 py-1.5 text-sm outline-none;
+    border-color: #d5dbdb;
+    background: #fff;
+    color: #16191f;
+  }
+}
